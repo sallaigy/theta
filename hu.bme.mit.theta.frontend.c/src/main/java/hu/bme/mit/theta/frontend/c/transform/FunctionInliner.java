@@ -29,6 +29,8 @@ import hu.bme.mit.theta.frontend.c.ir.node.ReturnNode;
 
 public class FunctionInliner implements Transformer {
 
+    private static int inlineId = 0;
+    
 	private static class FunctionInlineInfo {
 		public AssignNode<?, ?> node;
 		public Function function;

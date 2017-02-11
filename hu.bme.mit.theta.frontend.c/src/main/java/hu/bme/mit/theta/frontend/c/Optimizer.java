@@ -37,6 +37,8 @@ public class Optimizer {
 	}
 
 	public void transform() {
+	    this.inlineGlobalVariables();
+	    
 		// Perform global transformations
 		for (Transformer pass : this.transforms) {
 			this.log.writeln(String.format("Executing transformation pass '%s'", pass.getTransformationName()), 7);
@@ -88,8 +90,10 @@ public class Optimizer {
 	public void dump() {
 		this.log.writeHeader("DEBUG DUMP of Optimizer.", 7);
 		this.context.functions().forEach(fun -> {
-			this.log.writeln("-----" + fun.getName() + "-----", 7);
-			this.log.writeln(IrPrinter.toGraphvizString(fun), 7);
+		    if (fun.isEnabled()) {
+		        this.log.writeln("-----" + fun.getName() + "-----", 7);
+			    this.log.writeln(IrPrinter.toGraphvizString(fun), 7);
+		    }
 		});
 	}
 

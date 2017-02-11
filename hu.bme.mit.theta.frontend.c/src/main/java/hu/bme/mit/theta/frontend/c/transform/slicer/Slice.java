@@ -90,6 +90,10 @@ public class Slice {
 		return new SliceBuilder(function, criterion);
 	}
 	
+	public static Slice fromFunction(Function function) {
+	    return new Slice(function, function, Collections.emptyMap(), null, Collections.emptyMap(), Collections.emptyList());
+	}
+	
 	public static class SliceBuilder {		
 		private Function function;
 		private IrNode criterion;
