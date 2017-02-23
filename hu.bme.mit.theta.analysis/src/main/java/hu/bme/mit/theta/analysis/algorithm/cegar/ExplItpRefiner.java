@@ -1,86 +1,43 @@
 package hu.bme.mit.theta.analysis.algorithm.cegar;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 
-import java.util.function.Function;
+import java.util.Collection;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableList.Builder;
+
+import hu.bme.mit.theta.analysis.Action;
+import hu.bme.mit.theta.analysis.PrecTrace;
 import hu.bme.mit.theta.analysis.State;
 import hu.bme.mit.theta.analysis.Trace;
-import hu.bme.mit.theta.analysis.algorithm.ARG;
-import hu.bme.mit.theta.analysis.algorithm.ArgNode;
-import hu.bme.mit.theta.analysis.algorithm.ArgTrace;
-import hu.bme.mit.theta.analysis.expl.ExplPrecision;
-import hu.bme.mit.theta.analysis.expl.ExplState;
-import hu.bme.mit.theta.analysis.expr.ExprAction;
-import hu.bme.mit.theta.analysis.expr.ExprTraceChecker;
-import hu.bme.mit.theta.analysis.expr.ExprTraceStatus;
+import hu.bme.mit.theta.analysis.expl.ExplPrec;
 import hu.bme.mit.theta.analysis.expr.ItpRefutation;
-import hu.bme.mit.theta.common.ObjectUtils;
-import hu.bme.mit.theta.common.logging.Logger;
+import hu.bme.mit.theta.core.decl.VarDecl;
+import hu.bme.mit.theta.core.type.Type;
 import hu.bme.mit.theta.core.utils.impl.ExprUtils;
 
-public final class ExplItpRefiner<S extends State, A extends ExprAction> implements Refiner<S, A, ExplPrecision> {
+public class ExplItpRefiner<S extends State, A extends Action> implements
+		PrecRefiner<S, A, ExplPrec, ItpRefutation>, PrecTraceRefiner<S, A, ExplPrec, ItpRefutation> {
 
-	private final ExprTraceChecker<ItpRefutation> exprTraceChecker;
-	private final Logger logger;
-	private final Function<S, ExplState> mapper;
-
-	private ExplItpRefiner(final ExprTraceChecker<ItpRefutation> exprTraceChecker, final Function<S, ExplState> mapper,
-			final Logger logger) {
-		this.exprTraceChecker = checkNotNull(exprTraceChecker);
-		this.mapper = checkNotNull(mapper);
-		this.logger = checkNotNull(logger);
-	}
-
-	public static <S extends State, A extends ExprAction> ExplItpRefiner<S, A> create(
-			final ExprTraceChecker<ItpRefutation> exprTraceChecker, final Function<S, ExplState> mapper,
-			final Logger logger) {
-		return new ExplItpRefiner<>(exprTraceChecker, mapper, logger);
-	}
-
-	public static <A extends ExprAction> ExplItpRefiner<ExplState, A> create(
-			final ExprTraceChecker<ItpRefutation> exprTraceChecker, final Logger logger) {
-		return create(exprTraceChecker, s -> s, logger);
+	@Override
+	public ExplPrec refine(final Trace<S, A> trace, final ExplPrec prec,
+			final ItpRefutation refutation) {
+		final Collection<VarDecl<? extends Type>> vars = ExprUtils.getVars(refutation);
+		final ExplPrec refinedPrec = prec.join(ExplPrec.create(vars));
+		return refinedPrec;
 	}
 
 	@Override
-	public RefinerResult<S, A, ExplPrecision> refine(final ARG<S, A> arg, final ExplPrecision precision) {
-		checkNotNull(arg);
-		checkNotNull(precision);
-		checkArgument(!arg.isSafe());
-
-		final ArgTrace<S, A> cexToConcretize = arg.getCexs().findFirst().get();
-		final Trace<S, A> traceToConcretize = cexToConcretize.toTrace();
-		final Trace<ExplState, A> explStateTrace = traceToConcretize.mapStates(mapper);
-		logger.writeln("Trace length: ", traceToConcretize.length(), 3, 2);
-		logger.writeln("Trace: ", traceToConcretize, 4, 3);
-
-		logger.write("Checking...", 3, 2);
-		final ExprTraceStatus<ItpRefutation> cexStatus = exprTraceChecker.check(explStateTrace);
-		logger.writeln("done: ", cexStatus, 3, 0);
-
-		if (cexStatus.isFeasible()) {
-			return RefinerResult.unsafe(traceToConcretize);
-		} else if (cexStatus.isInfeasible()) {
-			final ItpRefutation interpolant = cexStatus.asInfeasible().getRefutation();
-			logger.writeln(interpolant, 4, 3);
-
-			final ExplPrecision refinedPrecision = precision.refine(ExprUtils.getVars(interpolant));
-			final int pruneIndex = interpolant.getPruneIndex();
-			checkState(0 <= pruneIndex && pruneIndex <= cexToConcretize.length());
-			logger.writeln("Pruning from index ", pruneIndex, 3, 2);
-			final ArgNode<S, A> nodeToPrune = cexToConcretize.node(pruneIndex);
-			arg.prune(nodeToPrune);
-			return RefinerResult.spurious(refinedPrecision);
-		} else {
-			throw new IllegalStateException("Unknown status.");
+	public PrecTrace<S, A, ExplPrec> refine(final PrecTrace<S, A, ExplPrec> trace,
+			final ItpRefutation refutation) {
+		checkArgument(trace.getPrecs().size() == refutation.size());
+		final Builder<ExplPrec> builder = ImmutableList.builder();
+		for (int i = 0; i < trace.getPrecs().size(); ++i) {
+			final Collection<VarDecl<? extends Type>> vars = ExprUtils.getVars(refutation.get(i));
+			final ExplPrec refinedPrec = trace.getPrec(i).join(ExplPrec.create(vars));
+			builder.add(refinedPrec);
 		}
-	}
-
-	@Override
-	public String toString() {
-		return ObjectUtils.toStringBuilder(getClass().getSimpleName()).add(exprTraceChecker).toString();
+		return PrecTrace.of(trace.getTrace(), builder.build());
 	}
 }
