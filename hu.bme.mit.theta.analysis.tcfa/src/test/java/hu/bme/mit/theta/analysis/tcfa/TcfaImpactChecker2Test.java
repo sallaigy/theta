@@ -6,7 +6,7 @@ import org.junit.Test;
 
 import hu.bme.mit.theta.analysis.algorithm.ARG;
 import hu.bme.mit.theta.analysis.algorithm.ArgChecker;
-import hu.bme.mit.theta.analysis.algorithm.SafetyStatus;
+import hu.bme.mit.theta.analysis.algorithm.SafetyResult;
 import hu.bme.mit.theta.analysis.expr.ExprAction;
 import hu.bme.mit.theta.analysis.expr.ExprState;
 import hu.bme.mit.theta.analysis.impl.NullPrec;
@@ -24,15 +24,14 @@ public final class TcfaImpactChecker2Test {
 	public void test() {
 		// Arrange
 		final int n = 2;
-		final TCFA fischer = TcfaModels.fischer(n, 1, 2);
+		final TCFA fischer = TcfaModels.fischer(n, 2);
 
 		final Solver solver = Z3SolverFactory.getInstace().createSolver();
 
 		final TcfaImpactChecker2 checker = TcfaImpactChecker2.create(fischer, solver, l -> false);
 
 		// Act
-		final SafetyStatus<? extends ExprState, ? extends ExprAction> status = checker
-				.check(NullPrec.getInstance());
+		final SafetyResult<? extends ExprState, ? extends ExprAction> status = checker.check(NullPrec.getInstance());
 
 		// Assert
 		assertTrue(status.isSafe());

@@ -19,6 +19,12 @@ CSV file describing the models.
 .PARAMETER configsFile
 CSV file describing the configurations.
 
+.PARAMETER outDir
+Path where the output log file is written.
+
+.PARAMETER toNoRep
+Do not repeat a measurement if it causes a timeout on its first run.
+
 .NOTES
 Author: Akos Hajdu
 #>
@@ -29,7 +35,8 @@ param (
     [string]$jarFile = "theta.jar",
     [Parameter(Mandatory=$true)][string]$modelsFile,
     [Parameter(Mandatory=$true)][string]$configsFile,
-    [string]$outDir = "./"
+    [string]$outDir = "./",
+    [switch]$toNoRep
 )
 
 # Temp file for individual runs
@@ -39,11 +46,13 @@ $tmpFile = [System.IO.Path]::GetTempFileName()
 #  in append mode. Therefore, the temp file is always overwritten, but the script always appends
 #  the contents of the temp file to the final log file.)
 $logFile = $outDir + "log_" + (Get-Date -format "yyyyMMdd_HHmmss") + ".csv"
-"Model,Vars,Size,Domain,Refinement,InitPrec,Search,Safe,TimeMs,Iterations,ARGsize,ARGdepth,CEXlen" | Out-File $logFile # Header
+# Header
+(Start-Process java -ArgumentList @('-jar', $jarFile, '--header') -RedirectStandardOutput $tmpFile -PassThru -NoNewWindow).WaitForExit()
+Get-Content $tmpFile | where {$_ -ne ""} | Out-File $logFile
 
 # Load models and configurations from external files
 $models = @(Import-CSV $modelsFile -Header Name, Prop, Expected)
-$configs = @(Import-CSV $configsFile -Header Domain, Refinement, InitPrec, Search)
+$configs = @(Import-CSV $configsFile -Header Domain, Refinement, InitPrec, Search, PredSplit)
 
 # Loop through models
 $m = 0
@@ -61,16 +70,10 @@ foreach($model in $models) {
             
             # Collect arguments for the jar file
             $args = @('-jar', $jarFile, '-m', $model.Name, '-d', $conf.Domain, '-r', $conf.Refinement, '-i', $conf.InitPrec, '-s', $conf.Search)
-            # If expected result is present in the CSV add it as a parameter
-            if ($model.Expected -ne $Null) {
-                $args += '-e'
-                $args += $model.Expected
-            }
-            # If preperty is present in the CSV add it as a parameter
-            if ($model.Prop) {
-                $args += '-p'
-                $args += $model.Prop
-            }
+            # Optional arguments            
+            if ($conf.PredSplit) { $args += @('-ps', $conf.PredSplit) }
+            if ($model.Expected) { $args += @('-e', $model.Expected) }
+            if ($model.Prop) { $args += @('-p', $model.Prop) }
             # Run the jar file with the given parameters, the output is redirected to a temp file
             $p = Start-Process java -ArgumentList $args -RedirectStandardOutput $tmpFile -PassThru -NoNewWindow
             $id = $p.id
@@ -78,6 +81,7 @@ foreach($model in $models) {
                 Stop-Process -Id $id
                 Wait-Process -Id $id
                 Start-Sleep -m 100 # Wait a bit so that the file is closed
+                if ($r -eq 0 -and $toNoRep) { $r = $runs } # Do not repeat if the first run is a timeout
             } 
             # Copy contents of the temp file to the log
             Get-Content $tmpFile | where {$_ -ne ""} | Out-File $logFile -Append

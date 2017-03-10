@@ -26,7 +26,7 @@ import hu.bme.mit.theta.analysis.algorithm.ARG;
 import hu.bme.mit.theta.analysis.algorithm.ArgBuilder;
 import hu.bme.mit.theta.analysis.algorithm.ArgNodeComparators;
 import hu.bme.mit.theta.analysis.algorithm.SafetyChecker;
-import hu.bme.mit.theta.analysis.algorithm.SafetyStatus;
+import hu.bme.mit.theta.analysis.algorithm.SafetyResult;
 import hu.bme.mit.theta.analysis.algorithm.cegar.Abstractor;
 import hu.bme.mit.theta.analysis.algorithm.cegar.BasicPrecRefiner;
 import hu.bme.mit.theta.analysis.algorithm.cegar.CegarChecker;
@@ -41,7 +41,7 @@ import hu.bme.mit.theta.analysis.expr.ExprState;
 import hu.bme.mit.theta.analysis.expr.ExprStatePredicate;
 import hu.bme.mit.theta.analysis.expr.ExprTraceChecker;
 import hu.bme.mit.theta.analysis.expr.ExprTraceUnsatCoreChecker;
-import hu.bme.mit.theta.analysis.expr.IndexedVarsRefutation;
+import hu.bme.mit.theta.analysis.expr.VarsRefutation;
 import hu.bme.mit.theta.analysis.waitlist.PriorityWaitlist;
 import hu.bme.mit.theta.common.logging.Logger;
 import hu.bme.mit.theta.common.logging.impl.ConsoleLogger;
@@ -93,15 +93,15 @@ public class StsExplTest {
 		final Abstractor<ExplState, StsAction, ExplPrec> abstractor = WaitlistBasedAbstractor.create(argBuilder,
 				PriorityWaitlist.supplier(ArgNodeComparators.bfs()), logger);
 
-		final ExprTraceChecker<IndexedVarsRefutation> exprTraceChecker = ExprTraceUnsatCoreChecker
+		final ExprTraceChecker<VarsRefutation> exprTraceChecker = ExprTraceUnsatCoreChecker
 				.create(And(sts.getInit()), Not(sts.getProp()), solver);
 
-		final SingleExprTraceRefiner<ExplState, StsAction, ExplPrec, IndexedVarsRefutation> refiner = SingleExprTraceRefiner
+		final SingleExprTraceRefiner<ExplState, StsAction, ExplPrec, VarsRefutation> refiner = SingleExprTraceRefiner
 				.create(exprTraceChecker, BasicPrecRefiner.create(new VarsRefToExplPrec()), logger);
 
 		final SafetyChecker<ExplState, StsAction, ExplPrec> checker = CegarChecker.create(abstractor, refiner, logger);
 
-		final SafetyStatus<ExplState, StsAction> safetyStatus = checker.check(prec);
+		final SafetyResult<ExplState, StsAction> safetyStatus = checker.check(prec);
 
 		final ARG<ExplState, StsAction> arg = safetyStatus.getArg();
 		assertTrue(isWellLabeled(arg, solver));
