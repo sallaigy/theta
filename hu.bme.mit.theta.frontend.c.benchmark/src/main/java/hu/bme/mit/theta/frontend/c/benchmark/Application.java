@@ -14,7 +14,6 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
 import hu.bme.mit.theta.analysis.Action;
-import hu.bme.mit.theta.analysis.Precision;
 import hu.bme.mit.theta.analysis.State;
 import hu.bme.mit.theta.analysis.Trace;
 import hu.bme.mit.theta.analysis.algorithm.ARG;
@@ -24,16 +23,18 @@ import hu.bme.mit.theta.analysis.expr.ExprAction;
 import hu.bme.mit.theta.analysis.expr.ExprState;
 import hu.bme.mit.theta.analysis.utils.ArgVisualizer;
 import hu.bme.mit.theta.analysis.utils.TraceVisualizer;
+import hu.bme.mit.theta.common.logging.Logger;
 import hu.bme.mit.theta.common.logging.impl.ConsoleLogger;
 import hu.bme.mit.theta.common.visualization.GraphvizWriter;
 import hu.bme.mit.theta.formalism.cfa.CFA;
 import hu.bme.mit.theta.formalism.cfa.utils.CfaVisualizer;
 import hu.bme.mit.theta.frontend.benchmark.CfaConfigurationBuilder;
+import hu.bme.mit.theta.frontend.benchmark.CfaConfigurationBuilder.PrecGranularity;
 import hu.bme.mit.theta.frontend.benchmark.StsConfigurationBuilder;
-import hu.bme.mit.theta.frontend.benchmark.CfaConfigurationBuilder.Domain;
-import hu.bme.mit.theta.frontend.benchmark.CfaConfigurationBuilder.Refinement;
-import hu.bme.mit.theta.frontend.benchmark.CfaConfigurationBuilder.Search;
 import hu.bme.mit.theta.frontend.benchmark.Configuration;
+import hu.bme.mit.theta.frontend.benchmark.ConfigurationBuilder.Domain;
+import hu.bme.mit.theta.frontend.benchmark.ConfigurationBuilder.Refinement;
+import hu.bme.mit.theta.frontend.benchmark.ConfigurationBuilder.Search;
 import hu.bme.mit.theta.frontend.c.Optimizer;
 import hu.bme.mit.theta.frontend.c.cfa.FunctionToCFATransformer;
 import hu.bme.mit.theta.frontend.c.ir.Function;
@@ -60,7 +61,7 @@ public class Application {
         optFile.setArgName("FILE");
         options.addOption(optFile);
 
-        Option optSlice = new Option("s", "slicer", true, "Slicing strategy");
+        Option optSlice = new Option("l", "slicer", true, "Slicing strategy");
         optSlice.setRequired(true);
         optSlice.setArgName("SLICER");
         options.addOption(optSlice);
@@ -80,6 +81,11 @@ public class Application {
         optSearch.setArgName("SEARCH");
         options.addOption(optSearch);
         
+        Option optPrecGran = new Option("g", "precision-granularity", true, "Precision granularity (CONST/GEN)");
+        optPrecGran.setRequired(true);
+        optPrecGran.setArgName("GRANULARITY");
+        options.addOption(optPrecGran);
+        
         Option optOptimize = new Option("o", "optimizations", false, "Optimizations on/off");
         optOptimize.setArgName("OPTIMIZE");
         options.addOption(optOptimize);
@@ -91,6 +97,7 @@ public class Application {
         try {
             cmd = cliParser.parse(options, args);
         } catch (ParseException e) {
+            e.printStackTrace();
             helpFormatter.printHelp("theta.jar", options);
             return;
         }
@@ -100,6 +107,7 @@ public class Application {
         Domain domain = Domain.valueOf(cmd.getOptionValue(optDomain.getOpt()));
         Refinement refinement = Refinement.valueOf(cmd.getOptionValue(optRefinement.getOpt()));
         Search search = Search.valueOf(cmd.getOptionValue(optSearch.getOpt()));
+        PrecGranularity pg = PrecGranularity.valueOf(cmd.getOptionValue(optPrecGran.getOpt()));
         
         boolean optimize = cmd.hasOption(optOptimize.getOpt());
 
@@ -135,13 +143,20 @@ public class Application {
 
         List<Slice> slices = opt.createSlices();
         for (int i = 0; i < slices.size(); i++) {
+            Logger log = new ConsoleLogger(3);
+            
             Slice slice = slices.get(i);
             
             Function cfg = slice.getSlicedFunction();
             CFA cfa = FunctionToCFATransformer.createLBE(cfg);
             
-            Configuration<?,?,?> configuration = new CfaConfigurationBuilder(domain, refinement).search(search).logger(new ConsoleLogger(3)).build(cfa);
+            Configuration<?,?,?> configuration = new CfaConfigurationBuilder(domain, refinement)
+                    .search(search)
+                    .precGranularity(pg)
+                    .logger(log)
+                    .build(cfa);
                         
+            log.writeHeader("Slice #" + i, 1);
             SafetyStatus<?, ?> status = configuration.check();
                                     
             if(status.isUnsafe()) {

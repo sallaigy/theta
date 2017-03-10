@@ -35,14 +35,7 @@ public class Application {
 		opt.transform();
 		
 		opt.dump();
-						
-		opt.createSlices().forEach(slice -> {
-			System.out.println(writer.writeString(FunctionVisualizer.visualize(slice)));
-		});
-		
-		opt.createCfaSlices(true).forEach(cfa -> {
-			System.out.println(writer.writeString(CfaVisualizer.visualize(cfa)));
-		});
+					
 		
 				
 	}
