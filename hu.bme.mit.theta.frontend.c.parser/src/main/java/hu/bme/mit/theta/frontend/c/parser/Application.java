@@ -3,12 +3,10 @@ package hu.bme.mit.theta.frontend.c.parser;
 
 import hu.bme.mit.theta.common.logging.impl.ConsoleLogger;
 import hu.bme.mit.theta.common.visualization.GraphvizWriter;
-import hu.bme.mit.theta.formalism.cfa.utils.CfaVisualizer;
 import hu.bme.mit.theta.frontend.c.Optimizer;
 import hu.bme.mit.theta.frontend.c.dependency.CallGraph;
 import hu.bme.mit.theta.frontend.c.dependency.utils.DependencyVisualizer;
 import hu.bme.mit.theta.frontend.c.ir.GlobalContext;
-import hu.bme.mit.theta.frontend.c.ir.utils.FunctionVisualizer;
 import hu.bme.mit.theta.frontend.c.transform.ConstantPropagator;
 import hu.bme.mit.theta.frontend.c.transform.DeadBranchEliminator;
 import hu.bme.mit.theta.frontend.c.transform.FunctionInliner;

@@ -9,14 +9,11 @@ import hu.bme.mit.theta.common.visualization.EdgeAttributes;
 import hu.bme.mit.theta.common.visualization.Graph;
 import hu.bme.mit.theta.common.visualization.NodeAttributes;
 import hu.bme.mit.theta.frontend.c.dependency.CallGraph;
-import hu.bme.mit.theta.frontend.c.dependency.ControlDependencyGraph;
+import hu.bme.mit.theta.frontend.c.dependency.CallGraph.CallGraphNode;
 import hu.bme.mit.theta.frontend.c.dependency.ProgramDependenceGraph;
 import hu.bme.mit.theta.frontend.c.dependency.ProgramDependenceGraph.PDGEdge;
 import hu.bme.mit.theta.frontend.c.dependency.ProgramDependenceGraph.PDGEdgeType;
 import hu.bme.mit.theta.frontend.c.dependency.ProgramDependenceGraph.PDGNode;
-import hu.bme.mit.theta.frontend.c.dependency.CallGraph.CallGraphNode;
-import hu.bme.mit.theta.frontend.c.ir.node.IrNode;
-import hu.bme.mit.theta.frontend.c.dependency.UseDefineChain;
 
 public class DependencyVisualizer {
 

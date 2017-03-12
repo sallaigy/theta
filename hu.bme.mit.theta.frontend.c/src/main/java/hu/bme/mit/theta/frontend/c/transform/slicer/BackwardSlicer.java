@@ -17,7 +17,6 @@ import hu.bme.mit.theta.frontend.c.ir.node.IrNode;
 import hu.bme.mit.theta.frontend.c.ir.node.NonTerminatorIrNode;
 import hu.bme.mit.theta.frontend.c.ir.node.TerminatorIrNode;
 import hu.bme.mit.theta.frontend.c.transform.slicer.Slice.SliceBuilder;
-import hu.bme.mit.theta.frontend.c.transform.slicer.utils.SliceCreator;
 
 public class BackwardSlicer implements FunctionSlicer {
 	

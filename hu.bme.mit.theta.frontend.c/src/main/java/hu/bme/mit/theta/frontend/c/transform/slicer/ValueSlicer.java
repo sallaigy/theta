@@ -30,7 +30,6 @@ import hu.bme.mit.theta.frontend.c.ir.node.JumpIfNode;
 import hu.bme.mit.theta.frontend.c.ir.node.TerminatorIrNode;
 import hu.bme.mit.theta.frontend.c.ir.utils.CfgEdge;
 import hu.bme.mit.theta.frontend.c.transform.slicer.Slice.SliceBuilder;
-import hu.bme.mit.theta.frontend.c.transform.slicer.utils.SliceCreator;
 
 public class ValueSlicer implements FunctionSlicer {
 

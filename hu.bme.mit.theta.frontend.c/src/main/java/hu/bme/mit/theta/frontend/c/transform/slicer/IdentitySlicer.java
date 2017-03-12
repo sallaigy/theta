@@ -4,7 +4,6 @@ import java.util.Collection;
 
 import hu.bme.mit.theta.frontend.c.ir.Function;
 import hu.bme.mit.theta.frontend.c.ir.node.IrNode;
-import hu.bme.mit.theta.frontend.c.transform.slicer.Slice.SliceBuilder;
 
 public class IdentitySlicer implements FunctionSlicer {
 
