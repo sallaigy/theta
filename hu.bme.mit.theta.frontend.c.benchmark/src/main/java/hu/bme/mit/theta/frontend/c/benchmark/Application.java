@@ -2,6 +2,7 @@ package hu.bme.mit.theta.frontend.c.benchmark;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import javax.management.RuntimeErrorException;
 
@@ -10,17 +11,25 @@ import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
+import org.apache.commons.cli.OptionGroup;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+
+import com.google.common.base.Stopwatch;
 
 import hu.bme.mit.theta.analysis.Trace;
 import hu.bme.mit.theta.analysis.algorithm.ARG;
 import hu.bme.mit.theta.analysis.algorithm.ArgChecker;
 import hu.bme.mit.theta.analysis.algorithm.SafetyResult;
+import hu.bme.mit.theta.analysis.algorithm.Statistics;
 import hu.bme.mit.theta.analysis.expr.ExprAction;
 import hu.bme.mit.theta.analysis.expr.ExprState;
 import hu.bme.mit.theta.common.logging.Logger;
 import hu.bme.mit.theta.common.logging.impl.ConsoleLogger;
+import hu.bme.mit.theta.common.logging.impl.FileLogger;
+import hu.bme.mit.theta.common.logging.impl.NullLogger;
+import hu.bme.mit.theta.common.table.TableWriter;
+import hu.bme.mit.theta.common.table.impl.SimpleTableWriter;
 import hu.bme.mit.theta.formalism.cfa.CFA;
 import hu.bme.mit.theta.frontend.benchmark.CfaConfigurationBuilder;
 import hu.bme.mit.theta.frontend.benchmark.CfaConfigurationBuilder.PrecGranularity;
@@ -58,10 +67,15 @@ public class Application {
         optFile.setRequired(true);
         optFile.setArgName("FILE");
         options.addOption(optFile);
-
+        
         Option optIndividual = new Option("i", "individual", false, "Whether to check individual slices (default false)");
         optIndividual.setArgName("INDIVIDUAL");
         options.addOption(optIndividual);
+        
+        Option optSliceNumber = new Option("n", "slice-num", true, "Slice number (only meaningful with -i)");
+        optSliceNumber.setRequired(false);
+        optSliceNumber.setArgName("SLICE_NO");
+        options.addOption(optSliceNumber);
         
         /* Options for the optimizer */
         
@@ -102,6 +116,11 @@ public class Application {
         options.addOption(optPrecGran);
         
         /* Other options */
+        Option optLogfile = new Option("lf", "log-file", true, "Logger file");
+        optLogfile.setRequired(false);
+        optLogfile.setArgName("LOGFILE");
+        options.addOption(optLogfile);
+        
         Option optVerbosity = new Option("v", "verbosity", true, "Logging verbosity level");
         optVerbosity.setRequired(false);
         optVerbosity.setArgName("VERBOSITY");
@@ -118,6 +137,31 @@ public class Application {
             helpFormatter.printHelp("theta.jar", options);
             return;
         }
+        
+        TableWriter tw = new SimpleTableWriter(System.out, ",", "\"", "\"");
+        
+        /*File,Slice No.,Slicer,Optimizations,Domain,Search,Refinement,InitLocs,InitEdges,Iterations,ArgSize,ArgDepth,EndLocs,EndEdges,Optimization Time,Verification Time,Refinements,Status*/
+        tw.cell("File");
+        tw.cell("Slice No.");
+        tw.cell("Slicer");
+        tw.cell("RefinementSlicer");
+        tw.cell("Optimizations");
+        tw.cell("Domain");
+        tw.cell("Search");
+        tw.cell("Refinement");
+        tw.cell("PrecGranuality");
+        tw.cell("InitLocs");
+        tw.cell("InitEdges");
+        tw.cell("Iterations");
+        tw.cell("ArgSize");
+        tw.cell("ArgDepth");
+        tw.cell("EndLocs");
+        tw.cell("EndEdges");
+        tw.cell("Optimization Time");
+        tw.cell("Verification Time");
+        tw.cell("Refinements");
+        tw.cell("Status");
+        tw.newRow();
 
         String filename = cmd.getOptionValue(optFile.getOpt());
         String slicerName = cmd.getOptionValue(optSlice.getOpt());
@@ -131,8 +175,18 @@ public class Application {
         // Optional arguments
         String verbosityVal = cmd.getOptionValue(optVerbosity.getOpt());
         String refinementSlicerVal = cmd.getOptionValue(optRefinementSlicer.getOpt());
-        
+
         int verbosity = verbosityVal != null ? Integer.parseInt(verbosityVal) : 1;
+        int initialSliceN = individual ? Integer.parseInt(cmd.getOptionValue(optSliceNumber.getOpt())) : 0;
+        
+        Logger log;
+        
+        if (cmd.hasOption(optLogfile.getOpt())) {
+            log = new FileLogger(verbosity, filename, true, false);
+        } else {
+            log = NullLogger.getInstance();
+        }       
+        
                 
         FunctionSlicer slicer = createSlicer(slicerName);
         FunctionSlicer refinementSlicer = refinementSlicerVal != null ? createSlicer(refinementSlicerVal) : new BackwardSlicer();
@@ -140,7 +194,6 @@ public class Application {
         GlobalContext context = Parser.parse(filename);
         Optimizer opt = new Optimizer(context, slicer);
         
-        Logger log = new ConsoleLogger(verbosity);
         
         opt.setLogger(log);
         opt.addTransformation(new FunctionInliner());
@@ -153,71 +206,111 @@ public class Application {
 
         List<Slice> slices = opt.createSlices();
         VerificationResult result = VerificationResult.SAFE;
-        
-        boolean outCont = true;
-        long verifTime = 0;
-        
+                
         log.writeln(String.format("Checking '%s' with the following configuration:", filename), 0);
         log.writeln(String.format("Slicer: %s", slicer.getClass().getSimpleName()), 0, 1);
         log.writeln(String.format("RefinementSlicer: %s", refinementSlicer.getClass().getSimpleName()), 0, 1);
         log.writeln(String.format("Individual slices: %s", individual), 0, 1);
         
-        int i;
-        for (i = 0; i < slices.size() && outCont; i++) {
+        int sliceMax = individual ? initialSliceN + 1 : slices.size();
+        
+        for (int i = initialSliceN; i < sliceMax; i++) {
             Slice slice = slices.get(i);
             slice.setRefinementSlicer(refinementSlicer);
+            
+            tw.cell(filename);
+            tw.cell(i);
+            tw.cell(slicer.getClass().getSimpleName());
+            tw.cell(refinementSlicer.getClass().getSimpleName());
+            tw.cell(optimize);
+            tw.cell(domain.toString());
+            tw.cell(search.toString());
+            tw.cell(refinement.toString());
+            tw.cell(pg.toString());
+            
+            // Get initial sizes
+            CFA initCfa = FunctionToCFATransformer.createLBE(slice.getSlicedFunction());
 
-            boolean cont = true;
-
-            log.writeHeader("Slice #" + i, 1);
-            while (cont) {
-                Function cfg = slice.getSlicedFunction();
-                CFA cfa = FunctionToCFATransformer.createLBE(cfg);
-                
-                Configuration<?,?,?> configuration = new CfaConfigurationBuilder(domain, refinement)
-                        .search(search)
-                        .precGranularity(pg)
-                        .logger(log)
-                        .build(cfa);
-    
-                SafetyResult<?, ?> status = configuration.check();
-                                
-                if (status.isUnsafe()) {
-                    final Trace<?, ?> cex = status.asUnsafe().getTrace();
-                    // The slice may require further refinement
-                    cont = slice.canRefine();
-                    if (!cont) {
-                        log.writeln("No slice refinement is possible. Slice is UNSAFE", 7, 1);
-                        // If no refinements are possible, this slice (and thus the whole program) is unsafe
-                        result = VerificationResult.UNSAFE;
-                        // If we do not wish check all slices, this is the time to stop
-                        outCont = individual;
-                    } else {
-                        log.writeln("Slice refinement is possible. Refining...", 7, 1);
-                        slice.refine();
-                    }
-                } else if (status.isSafe()) {
-                    @SuppressWarnings("unchecked")
-                    final ARG<? extends ExprState, ? extends ExprAction> arg = (ARG<? extends ExprState, ? extends ExprAction>) status.getArg();
-                    final ArgChecker checker = ArgChecker.create(Z3SolverFactory.getInstace().createSolver());
-                    if (!checker.isWellLabeled(arg) || !arg.isComplete() || !arg.isSafe()) {
-                        throw new AssertionError("Arg is not complete/well-labeled");
-                    }
-                    
-                    cont = false;
-                } else {
-                    throw new AssertionError();
-                }
-                
-                verifTime += status.getStats().get().getElapsedMillis();
+            tw.cell(initCfa.getLocs().size());
+            tw.cell(initCfa.getEdges().size());
+            
+            result = checkSlice(tw, domain, refinement, search, pg, log, result, i, slice);
+            tw.newRow();
+            
+            if (!individual && result == VerificationResult.UNSAFE) {
+                // If we are not checking individual slices and this slice was unsafe, it is time to stop.
+                log.writeln(String.format("Slice %d status is unsafe.", i), 0);
+                log.writeln(String.format("Program is UNSAFE."), 0);
+                break;
             }
         }
+    }
+
+    private static VerificationResult checkSlice(TableWriter tw, Domain domain, Refinement refinement, Search search,
+            PrecGranularity pg, Logger log, VerificationResult result, int i, Slice slice) throws AssertionError {
+        boolean cont = true;
+
+        long sliceVerifTime = 0;
+        long sliceRefinementTime = 0;
+        long refinementCnt = 0;
+
+        Stopwatch sw = Stopwatch.createUnstarted();
         
-        log.writeHeader(String.format("Results for '%s'", filename), 0);
-        log.writeln(String.format("Slice count: %d", slices.size()), 0);
-        log.writeln(String.format("Checked slices: %d", i), 0);
-        log.writeln(String.format("Verification time: %d ms", verifTime), 1);
-        log.writeln(String.format("Verification result: %s", result.toString()), 0);
+        log.writeHeader("Slice #" + i, 1);
+        while (cont) {
+            Function cfg = slice.getSlicedFunction();
+            CFA cfa = FunctionToCFATransformer.createLBE(cfg);
+            
+            Configuration<?,?,?> configuration = new CfaConfigurationBuilder(domain, refinement)
+                    .search(search)
+                    .precGranularity(pg)
+                    .logger(log)
+                    .build(cfa);
+   
+            SafetyResult<?, ?> status = configuration.check();
+            Statistics stats = status.getStats().get();
+            
+            
+            if (status.isUnsafe()) {
+               // final Trace<?, ?> cex = status.asUnsafe().getTrace();
+                // The slice may require further refinement
+                cont = slice.canRefine();
+                if (!cont) {
+                    log.writeln("No slice refinement is possible. Slice is UNSAFE", 7, 1);
+                    // If no refinements are possible, this slice (and thus the whole program) is unsafe
+                    result = VerificationResult.UNSAFE;
+                } else {
+                    log.writeln("Slice refinement is possible. Refining...", 7, 1);
+                    sw.reset();
+                    sw.start();                        
+                    
+                    slice.refine();
+                    
+                    sw.stop();
+                    sliceRefinementTime += sw.elapsed(TimeUnit.MILLISECONDS);
+                }
+            } else if (status.isSafe()) {                    
+                // The slice is safe, no refinements needed
+                cont = false;
+            } else {
+                throw new AssertionError();
+            }
+            
+            if (!cont) {                    
+                tw.cell(stats.getIterations());
+                tw.cell(status.getArg().size());
+                tw.cell(status.getArg().getDepth());
+                tw.cell(cfa.getLocs().size());
+                tw.cell(cfa.getEdges().size());
+                tw.cell(sliceRefinementTime);
+                tw.cell(sliceVerifTime);
+                tw.cell(refinementCnt);
+                tw.cell(result.toString());
+            } else {
+              //  verifTime += status.getStats().get().getElapsedMillis();
+            }                
+        }
+        return result;
     }
 
     private static FunctionSlicer createSlicer(String slicerName) {
