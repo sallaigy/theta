@@ -61,6 +61,37 @@ public class Application {
     }
     
     public static void main(String[] args) throws IOException, InterruptedException {
+        TableWriter tw = new SimpleTableWriter(System.out, ",", "\"", "\"");
+        
+        // If only called with a single --header argument, print header and exit
+        if (args.length == 1 && "--header".equals(args[0])) {            
+            /*File,Slice No.,Slicer,Optimizations,Domain,Search,Refinement,InitLocs,InitEdges,Iterations,ArgSize,ArgDepth,EndLocs,EndEdges,Optimization Time,Verification Time,Refinements,Status*/
+            tw.cell("File");
+            tw.cell("Slice No.");
+            tw.cell("Slicer");
+            tw.cell("RefinementSlicer");
+            tw.cell("Optimizations");
+            tw.cell("Domain");
+            tw.cell("Search");
+            tw.cell("Refinement");
+            tw.cell("PrecGranuality");
+            tw.cell("InitLocs");
+            tw.cell("InitEdges");
+            tw.cell("Iterations");
+            tw.cell("ArgSize");
+            tw.cell("ArgDepth");
+            tw.cell("EndLocs");
+            tw.cell("EndEdges");
+            tw.cell("Optimization Time");
+            tw.cell("Verification Time");
+            tw.cell("Refinements");
+            tw.cell("Status");
+            tw.newRow();
+            
+            return;
+        }
+        
+        
         Options options = new Options();
 
         Option optFile = new Option("f", "file", true, "Path of the input file.");
@@ -137,31 +168,6 @@ public class Application {
             helpFormatter.printHelp("theta.jar", options);
             return;
         }
-        
-        TableWriter tw = new SimpleTableWriter(System.out, ",", "\"", "\"");
-        
-        /*File,Slice No.,Slicer,Optimizations,Domain,Search,Refinement,InitLocs,InitEdges,Iterations,ArgSize,ArgDepth,EndLocs,EndEdges,Optimization Time,Verification Time,Refinements,Status*/
-        tw.cell("File");
-        tw.cell("Slice No.");
-        tw.cell("Slicer");
-        tw.cell("RefinementSlicer");
-        tw.cell("Optimizations");
-        tw.cell("Domain");
-        tw.cell("Search");
-        tw.cell("Refinement");
-        tw.cell("PrecGranuality");
-        tw.cell("InitLocs");
-        tw.cell("InitEdges");
-        tw.cell("Iterations");
-        tw.cell("ArgSize");
-        tw.cell("ArgDepth");
-        tw.cell("EndLocs");
-        tw.cell("EndEdges");
-        tw.cell("Optimization Time");
-        tw.cell("Verification Time");
-        tw.cell("Refinements");
-        tw.cell("Status");
-        tw.newRow();
 
         String filename = cmd.getOptionValue(optFile.getOpt());
         String slicerName = cmd.getOptionValue(optSlice.getOpt());
