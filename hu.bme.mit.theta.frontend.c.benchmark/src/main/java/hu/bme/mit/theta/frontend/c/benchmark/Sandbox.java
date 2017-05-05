@@ -46,16 +46,15 @@ public class Sandbox {
 
 
     public static void main(final String[] args) throws FileNotFoundException, IOException {
-        //System.out.println("Press a key to start");
-        //System.in.read();
+        System.out.println("Press a key to start");
+        System.in.read();
 
         /* Input parameters */
-        //String file = "/home/salla/projects/etc/theta-benchmark/tests-pruned/test_slicers.c";
         String file = "/home/salla/projects/etc/theta-benchmark/demo-tests/hello.c";
-        //FunctionSlicer slicer = new BackwardSlicer();
+        FunctionSlicer slicer = new BackwardSlicer();
 
         GlobalContext context = Parser.parse(file);
-        Optimizer opt = new Optimizer(context, new ValueSlicer());
+        Optimizer opt = new Optimizer(context, slicer);
 
         /* Add arbitrary transformations here */
         opt.addTransformation(new FunctionInliner());
@@ -64,27 +63,13 @@ public class Sandbox {
 
         opt.transform();
 
-        System.out.println("Locks1");
-
         List<Slice> slices = opt.createSlices();
         for (int i = 0; i < slices.size(); i++) {
             Slice slice = slices.get(i);
 
-
-            System.out.println(new GraphvizWriter().writeString(DependencyVisualizer.visualizePDG(ProgramDependenceGraph.create(slice.getSlicedFunction()))));
-            System.out.println(IrPrinter.toGraphvizString(slice.getSlicedFunction()));
-
             /* Use createSBE for single-block encoding, createLBE for large-block encoding */
             CFA cfa = FunctionToCFATransformer.createLBE(slice.getSlicedFunction());
 
-            int cnt = 0;
-            for (CfaEdge edge : cfa.getEdges()) {
-                cnt += edge.getStmts().size();
-            }
-
-            System.out.println("Stmt count: " + cnt);
-
-            new GraphvizWriter().writeFile(CfaVisualizer.visualize(cfa), "/tmp/slicers.dot");
         }
 
 
