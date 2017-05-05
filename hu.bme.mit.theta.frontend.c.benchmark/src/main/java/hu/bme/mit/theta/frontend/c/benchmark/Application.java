@@ -234,16 +234,6 @@ public class Application {
         for (int i = initialSliceN; i < sliceMax; i++) {
             Slice slice = slices.get(i);
             slice.setRefinementSlicer(refinementSlicer);
-/*
-            tw.cell(filename);
-            tw.cell(i);
-            tw.cell(slicer.getClass().getSimpleName());
-         //   tw.cell(refinementSlicer.getClass().getSimpleName());
-            tw.cell(optimize);
-            tw.cell(domain.toString());
-            tw.cell(search.toString());
-            tw.cell(refinement.toString()); */
-        //    tw.cell(pg.toString());
 
             // Get initial sizes
             CFA initCfa = FunctionToCFATransformer.createLBE(slice.getSlicedFunction());
