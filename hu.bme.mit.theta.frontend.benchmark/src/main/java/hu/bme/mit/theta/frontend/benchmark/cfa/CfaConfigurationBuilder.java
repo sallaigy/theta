@@ -1,4 +1,4 @@
-package hu.bme.mit.theta.frontend.benchmark;
+package hu.bme.mit.theta.frontend.benchmark.cfa;
 
 import hu.bme.mit.theta.analysis.Action;
 import hu.bme.mit.theta.analysis.Analysis;
@@ -39,6 +39,8 @@ import hu.bme.mit.theta.core.expr.impl.Exprs;
 import hu.bme.mit.theta.formalism.cfa.CFA;
 import hu.bme.mit.theta.formalism.cfa.CfaEdge;
 import hu.bme.mit.theta.formalism.cfa.CfaLoc;
+import hu.bme.mit.theta.frontend.benchmark.Configuration;
+import hu.bme.mit.theta.frontend.benchmark.ConfigurationBuilder;
 import hu.bme.mit.theta.solver.ItpSolver;
 import hu.bme.mit.theta.solver.SolverFactory;
 

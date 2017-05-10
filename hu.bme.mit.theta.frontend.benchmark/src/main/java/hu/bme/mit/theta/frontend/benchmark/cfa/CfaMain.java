@@ -1,4 +1,4 @@
-package hu.bme.mit.theta.frontend.c.benchmark;
+package hu.bme.mit.theta.frontend.benchmark.cfa;
 
 import java.io.IOException;
 import java.util.List;
@@ -22,12 +22,11 @@ import hu.bme.mit.theta.common.logging.impl.NullLogger;
 import hu.bme.mit.theta.common.table.TableWriter;
 import hu.bme.mit.theta.common.table.impl.SimpleTableWriter;
 import hu.bme.mit.theta.formalism.cfa.CFA;
-import hu.bme.mit.theta.frontend.benchmark.CfaConfigurationBuilder;
-import hu.bme.mit.theta.frontend.benchmark.CfaConfigurationBuilder.PrecGranularity;
 import hu.bme.mit.theta.frontend.benchmark.Configuration;
 import hu.bme.mit.theta.frontend.benchmark.ConfigurationBuilder.Domain;
 import hu.bme.mit.theta.frontend.benchmark.ConfigurationBuilder.Refinement;
 import hu.bme.mit.theta.frontend.benchmark.ConfigurationBuilder.Search;
+import hu.bme.mit.theta.frontend.benchmark.cfa.CfaConfigurationBuilder.PrecGranularity;
 import hu.bme.mit.theta.frontend.c.Optimizer;
 import hu.bme.mit.theta.frontend.c.cfa.FunctionToCFATransformer;
 import hu.bme.mit.theta.frontend.c.ir.Function;
@@ -43,7 +42,7 @@ import hu.bme.mit.theta.frontend.c.transform.slicer.Slice;
 import hu.bme.mit.theta.frontend.c.transform.slicer.ThinSlicer;
 import hu.bme.mit.theta.frontend.c.transform.slicer.ValueSlicer;
 
-public class Application {
+public class CfaMain {
 
 	public enum VerificationResult {
 		SAFE, UNSAFE, ERROR, UNKNOWN
