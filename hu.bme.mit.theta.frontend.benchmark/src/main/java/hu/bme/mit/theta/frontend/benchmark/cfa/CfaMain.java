@@ -2,6 +2,7 @@ package hu.bme.mit.theta.frontend.benchmark.cfa;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.cli.CommandLine;
@@ -88,12 +89,12 @@ public class CfaMain {
 		optFile.setArgName("FILE");
 		options.addOption(optFile);
 
-		final Option optIndividual = new Option("i", "individual", false,
-				"Whether to check individual slices (default false)");
-		optIndividual.setArgName("INDIVIDUAL");
-		options.addOption(optIndividual);
+		// final Option optIndividual = new Option("i", "individual", false,
+		// "Whether to check individual slices (default false)");
+		// optIndividual.setArgName("INDIVIDUAL");
+		// options.addOption(optIndividual);
 
-		final Option optSliceNumber = new Option("n", "slice-num", true, "Slice number (only meaningful with -i)");
+		final Option optSliceNumber = new Option("n", "slice-num", true, "Slice number");
 		optSliceNumber.setRequired(false);
 		optSliceNumber.setArgName("SLICE_NO");
 		options.addOption(optSliceNumber);
@@ -102,7 +103,7 @@ public class CfaMain {
 
 		final Option optSlice = new Option("l", "slicer", true, "Slicing strategy");
 		optSlice.setRequired(true);
-		optSlice.setArgName("SLICER");
+		optSlice.setArgName(options(Slicer.values()));
 		options.addOption(optSlice);
 
 		final Option optOptimize = new Option("o", "optimizations", true, "Optimization level");
@@ -112,29 +113,29 @@ public class CfaMain {
 
 		final Option optRefinementSlicer = new Option("e", "refinement-slicer", true, "Refinement slicer");
 		optRefinementSlicer.setRequired(false);
-		optRefinementSlicer.setArgName("REFINEMENT_SLICER");
+		optRefinementSlicer.setArgName(options(Slicer.values()));
 		options.addOption(optRefinementSlicer);
 
 		/* Options for the CEGAR algorithm */
 
 		final Option optDomain = new Option("d", "domain", true, "Abstract domain");
 		optDomain.setRequired(true);
-		optDomain.setArgName("DOMAIN");
+		optDomain.setArgName(options(Domain.values()));
 		options.addOption(optDomain);
 
 		final Option optRefinement = new Option("r", "refinement", true, "Refinement strategy");
 		optRefinement.setRequired(true);
-		optRefinement.setArgName("REFINEMENT");
+		optRefinement.setArgName(options(Refinement.values()));
 		options.addOption(optRefinement);
 
 		final Option optSearch = new Option("s", "search", true, "Search strategy");
 		optSearch.setRequired(true);
-		optSearch.setArgName("SEARCH");
+		optSearch.setArgName(options(Search.values()));
 		options.addOption(optSearch);
 
-		final Option optPrecGran = new Option("g", "precision-granularity", true, "Precision granularity (CONST/GEN)");
+		final Option optPrecGran = new Option("g", "precision-granularity", true, "Precision granularity");
 		optPrecGran.setRequired(true);
-		optPrecGran.setArgName("GRANULARITY");
+		optPrecGran.setArgName(options(PrecGranularity.values()));
 		options.addOption(optPrecGran);
 
 		/* Other options */
@@ -155,19 +156,19 @@ public class CfaMain {
 		try {
 			cmd = cliParser.parse(options, args);
 		} catch (final ParseException e) {
-			e.printStackTrace();
-			helpFormatter.printHelp("theta.jar", options);
+			System.out.println(e.getMessage());
+			helpFormatter.printHelp("theta-cfa.jar", options);
 			return;
 		}
 
 		final String filename = cmd.getOptionValue(optFile.getOpt());
-		final String slicerName = cmd.getOptionValue(optSlice.getOpt());
+		final FunctionSlicer slicer = Slicer.valueOf(cmd.getOptionValue(optSlice.getOpt())).createSlicer();
 		final Domain domain = Domain.valueOf(cmd.getOptionValue(optDomain.getOpt()));
 		final Refinement refinement = Refinement.valueOf(cmd.getOptionValue(optRefinement.getOpt()));
 		final Search search = Search.valueOf(cmd.getOptionValue(optSearch.getOpt()));
 		final PrecGranularity pg = PrecGranularity.valueOf(cmd.getOptionValue(optPrecGran.getOpt()));
 		final Integer optimizeLvl = Integer.parseInt(cmd.getOptionValue(optOptimize.getOpt()));
-		// boolean individual = cmd.hasOption(optIndividual.getOpt());
+		// final boolean individual = cmd.hasOption(optIndividual.getOpt());
 		final boolean individual = true;
 		final boolean optimize = optimizeLvl == 1;
 
@@ -186,9 +187,8 @@ public class CfaMain {
 			log = NullLogger.getInstance();
 		}
 
-		final FunctionSlicer slicer = createSlicer(slicerName);
-		final FunctionSlicer refinementSlicer = refinementSlicerVal != null ? createSlicer(refinementSlicerVal)
-				: new BackwardSlicer();
+		final FunctionSlicer refinementSlicer = (refinementSlicerVal == null)
+				? Slicer.valueOf(refinementSlicerVal).createSlicer() : Slicer.BACKWARD.createSlicer();
 
 		final GlobalContext context = Parser.parse(filename);
 		final Optimizer opt = new Optimizer(context, slicer);
@@ -232,14 +232,6 @@ public class CfaMain {
 
 			result = checkSlice(tw, domain, refinement, search, pg, log, result, i, slice, optTime);
 			tw.newRow();
-
-			if (!individual && result == VerificationResult.UNSAFE) {
-				// If we are not checking individual slices and this slice was
-				// unsafe, it is time to stop.
-				log.writeln(String.format("Slice %d status is unsafe.", i), 0);
-				log.writeln(String.format("Program is UNSAFE."), 0);
-				break;
-			}
 		}
 	}
 
@@ -311,26 +303,44 @@ public class CfaMain {
 		return result;
 	}
 
-	private static FunctionSlicer createSlicer(final String slicerName) {
-		FunctionSlicer slicer;
-		switch (slicerName) {
-		case "backward":
-			slicer = new BackwardSlicer();
-			break;
-		case "value":
-			slicer = new ValueSlicer();
-			break;
-		case "thin":
-			slicer = new ThinSlicer();
-			break;
-		case "none":
-			slicer = new IdentitySlicer();
-			break;
-		default:
-			throw new RuntimeException("Unknown slicer algorithm");
-		}
+	private static enum Slicer {
+		NONE {
+			@Override
+			public FunctionSlicer createSlicer() {
+				return new IdentitySlicer();
+			}
+		},
 
-		return slicer;
+		BACKWARD {
+			@Override
+			public FunctionSlicer createSlicer() {
+				return new BackwardSlicer();
+			}
+		},
+
+		VALUE {
+			@Override
+			public FunctionSlicer createSlicer() {
+				return new ValueSlicer();
+			}
+		},
+
+		THIN {
+			@Override
+			public FunctionSlicer createSlicer() {
+				return new ThinSlicer();
+			}
+		};
+
+		public abstract FunctionSlicer createSlicer();
+	}
+
+	private static String options(final Object[] objs) {
+		final StringJoiner sj = new StringJoiner("|");
+		for (final Object o : objs) {
+			sj.add(o.toString());
+		}
+		return sj.toString();
 	}
 
 }
