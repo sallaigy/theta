@@ -17,6 +17,7 @@ import hu.bme.mit.theta.analysis.expl.ExplPrec;
 import hu.bme.mit.theta.analysis.expl.ExplState;
 import hu.bme.mit.theta.analysis.expl.ItpRefToExplPrec;
 import hu.bme.mit.theta.analysis.expl.VarsRefToExplPrec;
+import hu.bme.mit.theta.analysis.expr.refinement.ExprTraceBwBinItpChecker;
 import hu.bme.mit.theta.analysis.expr.refinement.ExprTraceFwBinItpChecker;
 import hu.bme.mit.theta.analysis.expr.refinement.ExprTraceSeqItpChecker;
 import hu.bme.mit.theta.analysis.expr.refinement.ExprTraceUnsatCoreChecker;
@@ -108,6 +109,17 @@ public class CfaConfigurationBuilder extends ConfigurationBuilder {
 							GenericLocPrecRefiner.create(new ItpRefToExplPrec()), getLogger());
 				}
 				break;
+			case BW_BIN_ITP:
+				if (precGranularity == PrecGranularity.CONST) {
+					refiner = SingleExprTraceRefiner.create(
+							ExprTraceBwBinItpChecker.create(Exprs.True(), Exprs.True(), solver),
+							ConstLocPrecRefiner.create(new ItpRefToExplPrec()), getLogger());
+				} else {
+					refiner = SingleExprTraceRefiner.create(
+							ExprTraceBwBinItpChecker.create(Exprs.True(), Exprs.True(), solver),
+							GenericLocPrecRefiner.create(new ItpRefToExplPrec()), getLogger());
+				}
+				break;
 			case SEQ_ITP:
 				if (precGranularity == PrecGranularity.CONST) {
 					refiner = SingleExprTraceRefiner.create(
@@ -169,13 +181,26 @@ public class CfaConfigurationBuilder extends ConfigurationBuilder {
 							ExprTraceFwBinItpChecker.create(Exprs.True(), Exprs.True(), solver),
 							ConstLocPrecRefiner.create(new ItpRefToSimplePredPrec(solver, getPredSplit().splitter)),
 							getLogger());
-					break;
 				} else {
 					refiner = SingleExprTraceRefiner.create(
 							ExprTraceFwBinItpChecker.create(Exprs.True(), Exprs.True(), solver),
 							GenericLocPrecRefiner.create(new ItpRefToSimplePredPrec(solver, getPredSplit().splitter)),
 							getLogger());
 				}
+				break;
+			case BW_BIN_ITP:
+				if (precGranularity == PrecGranularity.CONST) {
+					refiner = SingleExprTraceRefiner.create(
+							ExprTraceBwBinItpChecker.create(Exprs.True(), Exprs.True(), solver),
+							ConstLocPrecRefiner.create(new ItpRefToSimplePredPrec(solver, getPredSplit().splitter)),
+							getLogger());
+				} else {
+					refiner = SingleExprTraceRefiner.create(
+							ExprTraceBwBinItpChecker.create(Exprs.True(), Exprs.True(), solver),
+							GenericLocPrecRefiner.create(new ItpRefToSimplePredPrec(solver, getPredSplit().splitter)),
+							getLogger());
+				}
+				break;
 			case SEQ_ITP:
 				if (precGranularity == PrecGranularity.CONST) {
 					refiner = SingleExprTraceRefiner.create(
