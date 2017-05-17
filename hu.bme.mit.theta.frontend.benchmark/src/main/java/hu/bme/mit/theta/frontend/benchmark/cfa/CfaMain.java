@@ -89,32 +89,23 @@ public class CfaMain {
 		optFile.setArgName("FILE");
 		options.addOption(optFile);
 
-		// final Option optIndividual = new Option("i", "individual", false,
-		// "Whether to check individual slices (default false)");
-		// optIndividual.setArgName("INDIVIDUAL");
-		// options.addOption(optIndividual);
-
-		final Option optSliceNumber = new Option("n", "slice-num", true, "Slice number");
-		optSliceNumber.setRequired(false);
-		optSliceNumber.setArgName("SLICE_NO");
-		options.addOption(optSliceNumber);
-
 		/* Options for the optimizer */
 
-		final Option optSlice = new Option("l", "slicer", true, "Slicing strategy");
-		optSlice.setRequired(true);
+		final Option optSlice = new Option("l", "slicer", true, "Slicing strategy (default : BACWARD)");
+		optSlice.setRequired(false);
 		optSlice.setArgName(options(Slicer.values()));
 		options.addOption(optSlice);
 
-		final Option optOptimize = new Option("o", "optimizations", true, "Optimization level");
-		optOptimize.setRequired(true);
-		optOptimize.setArgName("OPTIMIZE");
-		options.addOption(optOptimize);
-
-		final Option optRefinementSlicer = new Option("e", "refinement-slicer", true, "Refinement slicer");
+		final Option optRefinementSlicer = new Option("e", "refinement-slicer", true,
+				"Refinement slicer (default : BACKWARD)");
 		optRefinementSlicer.setRequired(false);
 		optRefinementSlicer.setArgName(options(Slicer.values()));
 		options.addOption(optRefinementSlicer);
+
+		final Option optOptimize = new Option("o", "optimization", true, "Optimize CFA (default : true)");
+		optOptimize.setRequired(false);
+		optOptimize.setArgName("true | false");
+		options.addOption(optOptimize);
 
 		/* Options for the CEGAR algorithm */
 
@@ -139,12 +130,12 @@ public class CfaMain {
 		options.addOption(optPrecGran);
 
 		/* Other options */
-		final Option optLogfile = new Option("lf", "log-file", true, "Logger file");
+		final Option optLogfile = new Option("lf", "log-file", true, "Logger file (default : no logging)");
 		optLogfile.setRequired(false);
 		optLogfile.setArgName("LOGFILE");
 		options.addOption(optLogfile);
 
-		final Option optVerbosity = new Option("v", "verbosity", true, "Logging verbosity level");
+		final Option optVerbosity = new Option("v", "verbosity", true, "Logging verbosity level (default : 1)");
 		optVerbosity.setRequired(false);
 		optVerbosity.setArgName("VERBOSITY");
 		options.addOption(optVerbosity);
@@ -162,22 +153,17 @@ public class CfaMain {
 		}
 
 		final String filename = cmd.getOptionValue(optFile.getOpt());
-		final FunctionSlicer slicer = Slicer.valueOf(cmd.getOptionValue(optSlice.getOpt())).createSlicer();
 		final Domain domain = Domain.valueOf(cmd.getOptionValue(optDomain.getOpt()));
 		final Refinement refinement = Refinement.valueOf(cmd.getOptionValue(optRefinement.getOpt()));
 		final Search search = Search.valueOf(cmd.getOptionValue(optSearch.getOpt()));
 		final PrecGranularity pg = PrecGranularity.valueOf(cmd.getOptionValue(optPrecGran.getOpt()));
-		final Integer optimizeLvl = Integer.parseInt(cmd.getOptionValue(optOptimize.getOpt()));
-		// final boolean individual = cmd.hasOption(optIndividual.getOpt());
-		final boolean individual = true;
-		final boolean optimize = optimizeLvl == 1;
 
-		// Optional arguments
-		final String verbosityVal = cmd.getOptionValue(optVerbosity.getOpt());
-		final String refinementSlicerVal = cmd.getOptionValue(optRefinementSlicer.getOpt());
+		final FunctionSlicer slicer = Slicer.valueOf(cmd.getOptionValue(optSlice.getOpt(), "BACKWARD")).createSlicer();
+		final FunctionSlicer refinementSlicer = Slicer
+				.valueOf(cmd.getOptionValue(optRefinementSlicer.getOpt(), "BACKWARD")).createSlicer();
+		final boolean optimize = Boolean.parseBoolean(cmd.getOptionValue(optOptimize.getOpt(), "true"));
 
-		final int verbosity = verbosityVal != null ? Integer.parseInt(verbosityVal) : 1;
-		final int initialSliceN = individual ? Integer.parseInt(cmd.getOptionValue(optSliceNumber.getOpt())) : 0;
+		final int verbosity = Integer.parseInt(cmd.getOptionValue(optVerbosity.getOpt(), "1"));
 
 		Logger log;
 
@@ -186,9 +172,6 @@ public class CfaMain {
 		} else {
 			log = NullLogger.getInstance();
 		}
-
-		final FunctionSlicer refinementSlicer = (refinementSlicerVal == null)
-				? Slicer.valueOf(refinementSlicerVal).createSlicer() : Slicer.BACKWARD.createSlicer();
 
 		final GlobalContext context = Parser.parse(filename);
 		final Optimizer opt = new Optimizer(context, slicer);
@@ -216,11 +199,10 @@ public class CfaMain {
 		log.writeln(String.format("Checking '%s' with the following configuration:", filename), 0);
 		log.writeln(String.format("Slicer: %s", slicer.getClass().getSimpleName()), 0, 1);
 		log.writeln(String.format("RefinementSlicer: %s", refinementSlicer.getClass().getSimpleName()), 0, 1);
-		log.writeln(String.format("Individual slices: %s", individual), 0, 1);
 
-		final int sliceMax = individual ? initialSliceN + 1 : slices.size();
+		final int sliceMax = slices.size();
 
-		for (int i = initialSliceN; i < sliceMax; i++) {
+		for (int i = 0; i < sliceMax; i++) {
 			final Slice slice = slices.get(i);
 			slice.setRefinementSlicer(refinementSlicer);
 
