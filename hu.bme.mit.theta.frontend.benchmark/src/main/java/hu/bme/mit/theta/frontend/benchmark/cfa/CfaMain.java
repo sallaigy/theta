@@ -20,8 +20,6 @@ import hu.bme.mit.theta.analysis.algorithm.cegar.CegarStatistics;
 import hu.bme.mit.theta.common.logging.Logger;
 import hu.bme.mit.theta.common.logging.impl.FileLogger;
 import hu.bme.mit.theta.common.logging.impl.NullLogger;
-import hu.bme.mit.theta.common.table.TableWriter;
-import hu.bme.mit.theta.common.table.impl.SimpleTableWriter;
 import hu.bme.mit.theta.formalism.cfa.CFA;
 import hu.bme.mit.theta.frontend.benchmark.Configuration;
 import hu.bme.mit.theta.frontend.benchmark.ConfigurationBuilder.Domain;
@@ -50,38 +48,6 @@ public class CfaMain {
 	}
 
 	public static void main(final String[] args) throws IOException, InterruptedException {
-		final TableWriter tw = new SimpleTableWriter(System.out, ",", "\"", "\"");
-
-		// If only called with a single --header argument, print header and exit
-		if (args.length == 1 && "--header".equals(args[0])) {
-			/*
-			 * File,Slice
-			 * No.,Slicer,Optimizations,Domain,Search,Refinement,InitLocs,
-			 * InitEdges,Iterations,ArgSize,ArgDepth,EndLocs,EndEdges,
-			 * Optimization Time,Verification Time,Refinements,Status
-			 */
-			/*
-			 * tw.cell("File"); tw.cell("Slice No."); tw.cell("Slicer");
-			 * //tw.cell("RefinementSlicer"); tw.cell("Optimizations");
-			 * tw.cell("Domain"); tw.cell("Search"); tw.cell("Refinement");
-			 */
-			// tw.cell("PrecGranuality");
-			tw.cell("InitLocs");
-			tw.cell("InitEdges");
-			tw.cell("Iterations");
-			tw.cell("ArgSize");
-			tw.cell("ArgDepth");
-			tw.cell("EndLocs");
-			tw.cell("EndEdges");
-			tw.cell("Optimization Time");
-			tw.cell("Verification Time");
-			tw.cell("Refinements");
-			tw.cell("Status");
-			tw.newRow();
-
-			return;
-		}
-
 		final Options options = new Options();
 
 		final Option optFile = new Option("f", "file", true, "Path of the input file.");
@@ -91,20 +57,20 @@ public class CfaMain {
 
 		/* Options for the optimizer */
 
-		final Option optSlice = new Option("l", "slicer", true, "Slicing strategy (default : BACWARD)");
+		final Option optSlice = new Option("l", "slicer", true, "Slicing strategy (default : BACKWARD)");
 		optSlice.setRequired(false);
-		optSlice.setArgName(options(Slicer.values()));
+		optSlice.setArgName("BACKWARD|VALUE|THIN");
 		options.addOption(optSlice);
 
 		final Option optRefinementSlicer = new Option("e", "refinement-slicer", true,
 				"Refinement slicer (default : BACKWARD)");
 		optRefinementSlicer.setRequired(false);
-		optRefinementSlicer.setArgName(options(Slicer.values()));
+		optRefinementSlicer.setArgName("BACKWARD|VALUE|THIN");
 		options.addOption(optRefinementSlicer);
 
 		final Option optOptimize = new Option("o", "optimization", true, "Optimize CFA (default : true)");
 		optOptimize.setRequired(false);
-		optOptimize.setArgName("true | false");
+		optOptimize.setArgName("true|false");
 		options.addOption(optOptimize);
 
 		/* Options for the CEGAR algorithm */
@@ -116,7 +82,7 @@ public class CfaMain {
 
 		final Option optRefinement = new Option("r", "refinement", true, "Refinement strategy");
 		optRefinement.setRequired(true);
-		optRefinement.setArgName(options(Refinement.values()));
+		optRefinement.setArgName("FW_BIN_ITP|SEQ_ITP|UNSAT_CORE");
 		options.addOption(optRefinement);
 
 		final Option optSearch = new Option("s", "search", true, "Search strategy");
@@ -130,7 +96,7 @@ public class CfaMain {
 		options.addOption(optPrecGran);
 
 		/* Other options */
-		final Option optLogfile = new Option("lf", "log-file", true, "Logger file (default : no logging)");
+		final Option optLogfile = new Option("lf", "log-file", true, "Logger file (default : none)");
 		optLogfile.setRequired(false);
 		optLogfile.setArgName("LOGFILE");
 		options.addOption(optLogfile);
@@ -205,25 +171,19 @@ public class CfaMain {
 		for (int i = 0; i < sliceMax; i++) {
 			final Slice slice = slices.get(i);
 			slice.setRefinementSlicer(refinementSlicer);
-
-			// Get initial sizes
-			final CFA initCfa = FunctionToCFATransformer.createLBE(slice.getSlicedFunction());
-
-			tw.cell(initCfa.getLocs().size());
-			tw.cell(initCfa.getEdges().size());
-
-			result = checkSlice(tw, domain, refinement, search, pg, log, result, i, slice, optTime);
-			tw.newRow();
+			result = checkSlice(domain, refinement, search, pg, log, result, i, slice, optTime);
 		}
 	}
 
-	private static VerificationResult checkSlice(final TableWriter tw, final Domain domain, final Refinement refinement,
-			final Search search, final PrecGranularity pg, final Logger log, VerificationResult result, final int i,
-			final Slice slice, final long optTime) throws AssertionError {
+	private static VerificationResult checkSlice(final Domain domain, final Refinement refinement, final Search search,
+			final PrecGranularity pg, final Logger log, VerificationResult result, final int i, final Slice slice,
+			final long optTime) throws AssertionError {
 		boolean cont = true;
 
 		long sliceVerifTime = 0;
+		@SuppressWarnings("unused")
 		long sliceRefinementTime = optTime;
+		@SuppressWarnings("unused")
 		long refinementCnt = 0;
 
 		final Stopwatch sw = Stopwatch.createUnstarted();
@@ -269,15 +229,15 @@ public class CfaMain {
 			sliceVerifTime += stats.getElapsedMillis();
 
 			if (!cont) {
-				tw.cell(stats.getIterations());
-				tw.cell(status.getArg().size());
-				tw.cell(status.getArg().getDepth());
-				tw.cell(cfa.getLocs().size());
-				tw.cell(cfa.getEdges().size());
-				tw.cell(sliceRefinementTime);
-				tw.cell(sliceVerifTime);
-				tw.cell(refinementCnt);
-				tw.cell(result.toString());
+				System.out.println("----------");
+				System.out.println("Slice " + i);
+				System.out.println("----------");
+				System.out.println("Status = " + result.toString());
+				System.out.println("TimeElapsedInMs = " + sliceVerifTime);
+				System.out.println("Iterations = " + stats.getIterations());
+				System.out.println("ArgSize = " + status.getArg().size());
+				System.out.println("ArgDepth = " + status.getArg().getDepth());
+				System.out.println();
 			} else {
 				// verifTime += status.getStats().get().getElapsedMillis();
 			}
