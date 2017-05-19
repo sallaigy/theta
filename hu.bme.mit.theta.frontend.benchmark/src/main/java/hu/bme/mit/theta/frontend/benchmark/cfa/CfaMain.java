@@ -50,7 +50,7 @@ public class CfaMain {
 	public static void main(final String[] args) throws IOException, InterruptedException {
 		final Options options = new Options();
 
-		final Option optFile = new Option("f", "file", true, "Path of the input file.");
+		final Option optFile = new Option("f", "file", true, "Path of the input file");
 		optFile.setRequired(true);
 		optFile.setArgName("FILE");
 		options.addOption(optFile);
@@ -82,7 +82,7 @@ public class CfaMain {
 
 		final Option optRefinement = new Option("r", "refinement", true, "Refinement strategy");
 		optRefinement.setRequired(true);
-		optRefinement.setArgName("FW_BIN_ITP|SEQ_ITP|UNSAT_CORE");
+		optRefinement.setArgName(options(Refinement.values()));
 		options.addOption(optRefinement);
 
 		final Option optSearch = new Option("s", "search", true, "Search strategy");
