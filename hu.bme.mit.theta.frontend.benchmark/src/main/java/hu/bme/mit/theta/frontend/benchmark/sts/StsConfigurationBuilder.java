@@ -1,6 +1,5 @@
-package hu.bme.mit.theta.frontend.benchmark;
+package hu.bme.mit.theta.frontend.benchmark.sts;
 
-import static hu.bme.mit.theta.core.expr.impl.Exprs.And;
 import static hu.bme.mit.theta.core.expr.impl.Exprs.Not;
 
 import java.util.function.Predicate;
@@ -48,6 +47,8 @@ import hu.bme.mit.theta.common.logging.Logger;
 import hu.bme.mit.theta.core.expr.Expr;
 import hu.bme.mit.theta.core.type.BoolType;
 import hu.bme.mit.theta.formalism.sts.STS;
+import hu.bme.mit.theta.frontend.benchmark.Configuration;
+import hu.bme.mit.theta.frontend.benchmark.ConfigurationBuilder;
 import hu.bme.mit.theta.solver.ItpSolver;
 import hu.bme.mit.theta.solver.SolverFactory;
 
@@ -95,7 +96,7 @@ public final class StsConfigurationBuilder extends ConfigurationBuilder {
 	public Configuration<? extends State, ? extends Action, ? extends Prec> build(final STS sts) {
 		final ItpSolver solver = getSolverFactory().createItpSolver();
 		final LTS<State, StsAction> lts = StsLts.create(sts);
-		final Expr<? extends BoolType> init = And(sts.getInit());
+		final Expr<? extends BoolType> init = sts.getInit();
 		final Expr<? extends BoolType> negProp = Not(sts.getProp());
 
 		StsInitPrec initPrecBuilder = null;
@@ -169,7 +170,8 @@ public final class StsConfigurationBuilder extends ConfigurationBuilder {
 			}
 			final Refiner<PredState, StsAction, SimplePredPrec> refiner = SingleExprTraceRefiner.create(
 					exprTraceChecker,
-					JoiningPrecRefiner.create(new ItpRefToSimplePredPrec(solver, getPredSplit().splitter)), getLogger());
+					JoiningPrecRefiner.create(new ItpRefToSimplePredPrec(solver, getPredSplit().splitter)),
+					getLogger());
 
 			final SafetyChecker<PredState, StsAction, SimplePredPrec> checker = CegarChecker.create(abstractor, refiner,
 					getLogger());
