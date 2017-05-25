@@ -199,102 +199,117 @@ public class CfaMain {
 		logger.writeln(String.format("RefinementSlicer: %s", refinementSlicer.getClass().getSimpleName()), 0, 1);
 
 		if (sliceNo >= 0) {
-			final Slice slice = slices.get(sliceNo);
-			slice.setRefinementSlicer(refinementSlicer);
-			checkSlice(domain, refinement, search, pg, logger, sliceNo, slice, optTime, benchmarkMode, tableWriter);
+			checkSlice(domain, refinement, search, pg, logger, sliceNo, slices, refinementSlicer, optTime,
+					benchmarkMode, tableWriter);
 		} else {
 			for (int i = 0; i < slices.size(); i++) {
-				final Slice slice = slices.get(i);
-				slice.setRefinementSlicer(refinementSlicer);
-				checkSlice(domain, refinement, search, pg, logger, i, slice, optTime, benchmarkMode, tableWriter);
+				checkSlice(domain, refinement, search, pg, logger, i, slices, refinementSlicer, optTime, benchmarkMode,
+						tableWriter);
 			}
 		}
 	}
 
 	private static void checkSlice(final Domain domain, final Refinement refinement, final Search search,
-			final PrecGranularity pg, final Logger log, final int i, final Slice slice, final long optTime,
-			final boolean benchmarkMode, final TableWriter tableWriter) throws AssertionError {
+			final PrecGranularity pg, final Logger log, final int sliceNo, final List<Slice> slices,
+			final FunctionSlicer refinementSlicer, final long optTime, final boolean benchmarkMode,
+			final TableWriter tableWriter) throws AssertionError {
 
-		long sliceVerifTime = 0;
-		int sliceCegarIterations = 0;
-		@SuppressWarnings("unused")
-		long sliceRefinementTime = optTime;
-		@SuppressWarnings("unused")
-		long refinementCnt = 0;
-
-		final Stopwatch sw = Stopwatch.createUnstarted();
-
-		log.writeHeader("Slice #" + i, 1);
+		log.writeHeader("Slice #" + sliceNo, 1);
 		if (benchmarkMode) {
-			tableWriter.cell(i);
+			tableWriter.cell(sliceNo);
 		}
 
-		SafetyResult<?, ?> status;
-		CFA cfa;
-		boolean cont = true;
-		do {
-			final Function cfg = slice.getSlicedFunction();
-			cfa = FunctionToCFATransformer.createLBE(cfg);
+		try {
+			final Slice slice = slices.get(sliceNo);
+			slice.setRefinementSlicer(refinementSlicer);
+			long sliceVerifTime = 0;
+			int sliceCegarIterations = 0;
+			@SuppressWarnings("unused")
+			long sliceRefinementTime = optTime;
+			@SuppressWarnings("unused")
+			long refinementCnt = 0;
 
-			final Configuration<?, ?, ?> configuration = new CfaConfigurationBuilder(domain, refinement).search(search)
-					.precGranularity(pg).logger(log).build(cfa);
+			final Stopwatch sw = Stopwatch.createUnstarted();
 
-			status = configuration.check();
-			final CegarStatistics stats = (CegarStatistics) status.getStats().get();
-			sliceVerifTime += stats.getElapsedMillis();
-			sliceCegarIterations += stats.getIterations();
+			SafetyResult<?, ?> status;
+			CFA cfa;
+			boolean cont = true;
+			do {
+				final Function cfg = slice.getSlicedFunction();
+				cfa = FunctionToCFATransformer.createLBE(cfg);
 
-			if (status.isUnsafe()) {
-				// final Trace<?, ?> cex = status.asUnsafe().getTrace();
-				// The slice may require further refinement
-				cont = slice.canRefine();
-				if (!cont) {
-					log.writeln("No slice refinement is possible. Slice is UNSAFE", 7, 1);
+				final Configuration<?, ?, ?> configuration = new CfaConfigurationBuilder(domain, refinement)
+						.search(search).precGranularity(pg).logger(log).build(cfa);
+
+				status = configuration.check();
+				final CegarStatistics stats = (CegarStatistics) status.getStats().get();
+				sliceVerifTime += stats.getElapsedMillis();
+				sliceCegarIterations += stats.getIterations();
+
+				if (status.isUnsafe()) {
+					// final Trace<?, ?> cex = status.asUnsafe().getTrace();
+					// The slice may require further refinement
+					cont = slice.canRefine();
+					if (!cont) {
+						log.writeln("No slice refinement is possible. Slice is UNSAFE", 7, 1);
+					} else {
+						log.writeln("Slice refinement is possible. Refining...", 7, 1);
+						sw.reset();
+						sw.start();
+
+						slice.refine();
+
+						sw.stop();
+						refinementCnt++;
+						sliceRefinementTime += sw.elapsed(TimeUnit.MILLISECONDS);
+					}
+				} else if (status.isSafe()) {
+					// The slice is safe, no refinements needed
+					cont = false;
 				} else {
-					log.writeln("Slice refinement is possible. Refining...", 7, 1);
-					sw.reset();
-					sw.start();
-
-					slice.refine();
-
-					sw.stop();
-					refinementCnt++;
-					sliceRefinementTime += sw.elapsed(TimeUnit.MILLISECONDS);
+					throw new AssertionError();
 				}
-			} else if (status.isSafe()) {
-				// The slice is safe, no refinements needed
-				cont = false;
+
+			} while (cont);
+			if (benchmarkMode) {
+				tableWriter.cell(status.isSafe());
+				tableWriter.cell(sliceVerifTime);
+				tableWriter.cell(sliceCegarIterations);
+				tableWriter.cell(status.getArg().size());
+				tableWriter.cell(status.getArg().getDepth());
+				tableWriter.cell(status.getArg().getMeanBranchingFactor());
+				if (status.isUnsafe()) {
+					tableWriter.cell(status.asUnsafe().getTrace().length());
+				} else {
+					tableWriter.cell("");
+				}
+				tableWriter.cell(getCfaVars(cfa).size());
+				tableWriter.cell(cfa.getLocs().size());
 			} else {
-				throw new AssertionError();
+				System.out.println("----------");
+				System.out.println("Slice " + sliceNo);
+				System.out.println("----------");
+				System.out.println("Safe = " + status.isSafe());
+				System.out.println("TimeElapsedInMs = " + sliceVerifTime);
+				System.out.println("Iterations = " + sliceCegarIterations);
+				System.out.println("ArgSize = " + status.getArg().size());
+				System.out.println("ArgDepth = " + status.getArg().getDepth());
+				System.out.println();
+			}
+		} catch (final Throwable ex) {
+			final String message = ex.getMessage() == null ? "" : ": " + ex.getMessage();
+			if (benchmarkMode) {
+				tableWriter.cell("[EX] " + ex.getClass().getSimpleName() + message);
+			} else {
+				log.writeln("Exception occured: " + ex.getClass().getSimpleName(), 0);
+				log.writeln("Message: " + ex.getMessage(), 0, 1);
 			}
 
-		} while (cont);
-		if (benchmarkMode) {
-			tableWriter.cell(status.isSafe());
-			tableWriter.cell(sliceVerifTime);
-			tableWriter.cell(sliceCegarIterations);
-			tableWriter.cell(status.getArg().size());
-			tableWriter.cell(status.getArg().getDepth());
-			tableWriter.cell(status.getArg().getMeanBranchingFactor());
-			if (status.isUnsafe()) {
-				tableWriter.cell(status.asUnsafe().getTrace().length());
-			} else {
-				tableWriter.cell("");
-			}
-			tableWriter.cell(getCfaVars(cfa).size());
-			tableWriter.cell(cfa.getLocs().size());
-			tableWriter.newRow();
-		} else {
-			System.out.println("----------");
-			System.out.println("Slice " + i);
-			System.out.println("----------");
-			System.out.println("Safe = " + status.isSafe());
-			System.out.println("TimeElapsedInMs = " + sliceVerifTime);
-			System.out.println("Iterations = " + sliceCegarIterations);
-			System.out.println("ArgSize = " + status.getArg().size());
-			System.out.println("ArgDepth = " + status.getArg().getDepth());
-			System.out.println();
 		}
+		if (benchmarkMode) {
+			tableWriter.newRow();
+		}
+
 	}
 
 	private static Set<VarDecl<? extends Type>> getCfaVars(final CFA cfa) {
