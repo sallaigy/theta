@@ -80,6 +80,10 @@ public class CfaMain {
 		optFile.setArgName("FILE");
 		options.addOption(optFile);
 
+		final Option optSliceNo = new Option("sn", "sliceno", true, "Number of the slice to be verified");
+		optFile.setArgName("INT");
+		options.addOption(optSliceNo);
+
 		/* Options for the optimizer */
 
 		final Option optSlice = new Option("l", "slicer", true, "Slicing strategy (default : BACKWARD)");
@@ -160,6 +164,8 @@ public class CfaMain {
 
 		final int verbosity = Integer.parseInt(cmd.getOptionValue(optVerbosity.getOpt(), "1"));
 
+		final int sliceNo = Integer.parseInt(cmd.getOptionValue(optSliceNo.getOpt(), "-1"));
+
 		final boolean benchmarkMode = cmd.hasOption(optBenchmark.getOpt());
 
 		Logger logger;
@@ -192,10 +198,16 @@ public class CfaMain {
 		logger.writeln(String.format("Slicer: %s", slicer.getClass().getSimpleName()), 0, 1);
 		logger.writeln(String.format("RefinementSlicer: %s", refinementSlicer.getClass().getSimpleName()), 0, 1);
 
-		for (int i = 0; i < slices.size(); i++) {
-			final Slice slice = slices.get(i);
+		if (sliceNo >= 0) {
+			final Slice slice = slices.get(sliceNo);
 			slice.setRefinementSlicer(refinementSlicer);
-			checkSlice(domain, refinement, search, pg, logger, i, slice, optTime, benchmarkMode, tableWriter);
+			checkSlice(domain, refinement, search, pg, logger, sliceNo, slice, optTime, benchmarkMode, tableWriter);
+		} else {
+			for (int i = 0; i < slices.size(); i++) {
+				final Slice slice = slices.get(i);
+				slice.setRefinementSlicer(refinementSlicer);
+				checkSlice(domain, refinement, search, pg, logger, i, slice, optTime, benchmarkMode, tableWriter);
+			}
 		}
 	}
 
