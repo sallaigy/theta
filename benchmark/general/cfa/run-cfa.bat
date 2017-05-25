@@ -1,0 +1,1 @@
+powershell ..\Run-Measurements.ps1 -jarFile theta-cfa.jar -modelsFiles models-cfa.csv -configsFile configs-cfa.csv -timeOut 600 -runs 1 -toNoRep -jvmArgs \"-ea\"
