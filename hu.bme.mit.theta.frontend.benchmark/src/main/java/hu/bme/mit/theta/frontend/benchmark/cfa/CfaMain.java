@@ -173,7 +173,7 @@ public class CfaMain {
 		if (benchmarkMode) {
 			logger = NullLogger.getInstance();
 		} else if (cmd.hasOption(optLogfile.getOpt())) {
-			logger = new FileLogger(verbosity, filename, true, false);
+			logger = new FileLogger(verbosity, cmd.getOptionValue(optLogfile.getOpt()), true, false);
 		} else {
 			logger = NullLogger.getInstance();
 		}
