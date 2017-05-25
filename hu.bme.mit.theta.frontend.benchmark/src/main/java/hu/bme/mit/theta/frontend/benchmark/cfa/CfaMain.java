@@ -106,6 +106,10 @@ public class CfaMain {
 		optVerbosity.setArgName("VERBOSITY");
 		options.addOption(optVerbosity);
 
+		final Option optBenchmark = Option.builder("bm").longOpt("benchmark")
+				.desc("Benchmark mode (only print output values)").build();
+		options.addOption(optBenchmark);
+
 		final CommandLineParser cliParser = new DefaultParser();
 		final HelpFormatter helpFormatter = new HelpFormatter();
 		CommandLine cmd;
@@ -131,56 +135,51 @@ public class CfaMain {
 
 		final int verbosity = Integer.parseInt(cmd.getOptionValue(optVerbosity.getOpt(), "1"));
 
-		Logger log;
+		final boolean benchmarkMode = cmd.hasOption(optBenchmark.getOpt());
 
-		if (cmd.hasOption(optLogfile.getOpt())) {
-			log = new FileLogger(verbosity, filename, true, false);
+		Logger logger;
+
+		if (benchmarkMode) {
+			logger = NullLogger.getInstance();
+		} else if (cmd.hasOption(optLogfile.getOpt())) {
+			logger = new FileLogger(verbosity, filename, true, false);
 		} else {
-			log = NullLogger.getInstance();
+			logger = NullLogger.getInstance();
 		}
 
 		final GlobalContext context = Parser.parse(filename);
 		final Optimizer opt = new Optimizer(context, slicer);
 
-		opt.setLogger(log);
+		opt.setLogger(logger);
 		opt.addTransformation(new FunctionInliner());
 		if (optimize) {
 			opt.addTransformation(new ConstantPropagator());
 			opt.addTransformation(new DeadBranchEliminator());
 		}
 
-		final Stopwatch sw = Stopwatch.createUnstarted();
-
-		sw.start();
-
+		final Stopwatch sw = Stopwatch.createStarted();
 		opt.transform();
 		final List<Slice> slices = opt.createSlices();
-
 		sw.stop();
-
 		final long optTime = sw.elapsed(TimeUnit.MILLISECONDS);
 
-		VerificationResult result = VerificationResult.SAFE;
+		logger.writeln(String.format("Checking '%s' with the following configuration:", filename), 0);
+		logger.writeln(String.format("Slicer: %s", slicer.getClass().getSimpleName()), 0, 1);
+		logger.writeln(String.format("RefinementSlicer: %s", refinementSlicer.getClass().getSimpleName()), 0, 1);
 
-		log.writeln(String.format("Checking '%s' with the following configuration:", filename), 0);
-		log.writeln(String.format("Slicer: %s", slicer.getClass().getSimpleName()), 0, 1);
-		log.writeln(String.format("RefinementSlicer: %s", refinementSlicer.getClass().getSimpleName()), 0, 1);
-
-		final int sliceMax = slices.size();
-
-		for (int i = 0; i < sliceMax; i++) {
+		for (int i = 0; i < slices.size(); i++) {
 			final Slice slice = slices.get(i);
 			slice.setRefinementSlicer(refinementSlicer);
-			result = checkSlice(domain, refinement, search, pg, log, result, i, slice, optTime);
+			checkSlice(domain, refinement, search, pg, logger, i, slice, optTime);
 		}
 	}
 
-	private static VerificationResult checkSlice(final Domain domain, final Refinement refinement, final Search search,
-			final PrecGranularity pg, final Logger log, VerificationResult result, final int i, final Slice slice,
-			final long optTime) throws AssertionError {
-		boolean cont = true;
+	private static void checkSlice(final Domain domain, final Refinement refinement, final Search search,
+			final PrecGranularity pg, final Logger log, final int i, final Slice slice, final long optTime)
+			throws AssertionError {
 
 		long sliceVerifTime = 0;
+		int sliceCegarIterations = 0;
 		@SuppressWarnings("unused")
 		long sliceRefinementTime = optTime;
 		@SuppressWarnings("unused")
@@ -189,15 +188,20 @@ public class CfaMain {
 		final Stopwatch sw = Stopwatch.createUnstarted();
 
 		log.writeHeader("Slice #" + i, 1);
-		while (cont) {
+
+		SafetyResult<?, ?> status;
+		boolean cont = true;
+		do {
 			final Function cfg = slice.getSlicedFunction();
 			final CFA cfa = FunctionToCFATransformer.createLBE(cfg);
 
 			final Configuration<?, ?, ?> configuration = new CfaConfigurationBuilder(domain, refinement).search(search)
 					.precGranularity(pg).logger(log).build(cfa);
 
-			final SafetyResult<?, ?> status = configuration.check();
+			status = configuration.check();
 			final CegarStatistics stats = (CegarStatistics) status.getStats().get();
+			sliceVerifTime += stats.getElapsedMillis();
+			sliceCegarIterations += stats.getIterations();
 
 			if (status.isUnsafe()) {
 				// final Trace<?, ?> cex = status.asUnsafe().getTrace();
@@ -205,9 +209,6 @@ public class CfaMain {
 				cont = slice.canRefine();
 				if (!cont) {
 					log.writeln("No slice refinement is possible. Slice is UNSAFE", 7, 1);
-					// If no refinements are possible, this slice (and thus the
-					// whole program) is unsafe
-					result = VerificationResult.UNSAFE;
 				} else {
 					log.writeln("Slice refinement is possible. Refining...", 7, 1);
 					sw.reset();
@@ -226,23 +227,16 @@ public class CfaMain {
 				throw new AssertionError();
 			}
 
-			sliceVerifTime += stats.getElapsedMillis();
-
-			if (!cont) {
-				System.out.println("----------");
-				System.out.println("Slice " + i);
-				System.out.println("----------");
-				System.out.println("Status = " + result.toString());
-				System.out.println("TimeElapsedInMs = " + sliceVerifTime);
-				System.out.println("Iterations = " + stats.getIterations());
-				System.out.println("ArgSize = " + status.getArg().size());
-				System.out.println("ArgDepth = " + status.getArg().getDepth());
-				System.out.println();
-			} else {
-				// verifTime += status.getStats().get().getElapsedMillis();
-			}
-		}
-		return result;
+		} while (cont);
+		System.out.println("----------");
+		System.out.println("Slice " + i);
+		System.out.println("----------");
+		System.out.println("Safe = " + status.isSafe());
+		System.out.println("TimeElapsedInMs = " + sliceVerifTime);
+		System.out.println("Iterations = " + sliceCegarIterations);
+		System.out.println("ArgSize = " + status.getArg().size());
+		System.out.println("ArgDepth = " + status.getArg().getDepth());
+		System.out.println();
 	}
 
 	private static enum Slicer {
