@@ -1,7 +1,9 @@
 package hu.bme.mit.theta.frontend.benchmark.cfa;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.TimeUnit;
 
@@ -20,7 +22,13 @@ import hu.bme.mit.theta.analysis.algorithm.cegar.CegarStatistics;
 import hu.bme.mit.theta.common.logging.Logger;
 import hu.bme.mit.theta.common.logging.impl.FileLogger;
 import hu.bme.mit.theta.common.logging.impl.NullLogger;
+import hu.bme.mit.theta.common.table.TableWriter;
+import hu.bme.mit.theta.common.table.impl.SimpleTableWriter;
+import hu.bme.mit.theta.core.decl.VarDecl;
+import hu.bme.mit.theta.core.type.Type;
+import hu.bme.mit.theta.core.utils.impl.StmtUtils;
 import hu.bme.mit.theta.formalism.cfa.CFA;
+import hu.bme.mit.theta.formalism.cfa.CfaEdge;
 import hu.bme.mit.theta.frontend.benchmark.Configuration;
 import hu.bme.mit.theta.frontend.benchmark.ConfigurationBuilder.Domain;
 import hu.bme.mit.theta.frontend.benchmark.ConfigurationBuilder.Refinement;
@@ -48,6 +56,23 @@ public class CfaMain {
 	}
 
 	public static void main(final String[] args) throws IOException, InterruptedException {
+		final TableWriter tableWriter = new SimpleTableWriter(System.out, ",", "\"", "\"");
+		// If only called with a single --header argument, print header and exit
+		if (args.length == 1 && "--header".equals(args[0])) {
+			tableWriter.cell("SliceNo");
+			tableWriter.cell("Safe");
+			tableWriter.cell("TimeMs");
+			tableWriter.cell("Iterations");
+			tableWriter.cell("ArgSize");
+			tableWriter.cell("ArgDepth");
+			tableWriter.cell("ArgMeanBranchFactor");
+			tableWriter.cell("CexLen");
+			tableWriter.cell("Vars");
+			tableWriter.cell("Size");
+			tableWriter.newRow();
+			return;
+		}
+
 		final Options options = new Options();
 
 		final Option optFile = new Option("f", "file", true, "Path of the input file");
@@ -170,13 +195,13 @@ public class CfaMain {
 		for (int i = 0; i < slices.size(); i++) {
 			final Slice slice = slices.get(i);
 			slice.setRefinementSlicer(refinementSlicer);
-			checkSlice(domain, refinement, search, pg, logger, i, slice, optTime);
+			checkSlice(domain, refinement, search, pg, logger, i, slice, optTime, benchmarkMode, tableWriter);
 		}
 	}
 
 	private static void checkSlice(final Domain domain, final Refinement refinement, final Search search,
-			final PrecGranularity pg, final Logger log, final int i, final Slice slice, final long optTime)
-			throws AssertionError {
+			final PrecGranularity pg, final Logger log, final int i, final Slice slice, final long optTime,
+			final boolean benchmarkMode, final TableWriter tableWriter) throws AssertionError {
 
 		long sliceVerifTime = 0;
 		int sliceCegarIterations = 0;
@@ -188,12 +213,16 @@ public class CfaMain {
 		final Stopwatch sw = Stopwatch.createUnstarted();
 
 		log.writeHeader("Slice #" + i, 1);
+		if (benchmarkMode) {
+			tableWriter.cell(i);
+		}
 
 		SafetyResult<?, ?> status;
+		CFA cfa;
 		boolean cont = true;
 		do {
 			final Function cfg = slice.getSlicedFunction();
-			final CFA cfa = FunctionToCFATransformer.createLBE(cfg);
+			cfa = FunctionToCFATransformer.createLBE(cfg);
 
 			final Configuration<?, ?, ?> configuration = new CfaConfigurationBuilder(domain, refinement).search(search)
 					.precGranularity(pg).logger(log).build(cfa);
@@ -228,15 +257,40 @@ public class CfaMain {
 			}
 
 		} while (cont);
-		System.out.println("----------");
-		System.out.println("Slice " + i);
-		System.out.println("----------");
-		System.out.println("Safe = " + status.isSafe());
-		System.out.println("TimeElapsedInMs = " + sliceVerifTime);
-		System.out.println("Iterations = " + sliceCegarIterations);
-		System.out.println("ArgSize = " + status.getArg().size());
-		System.out.println("ArgDepth = " + status.getArg().getDepth());
-		System.out.println();
+		if (benchmarkMode) {
+			tableWriter.cell(status.isSafe());
+			tableWriter.cell(sliceVerifTime);
+			tableWriter.cell(sliceCegarIterations);
+			tableWriter.cell(status.getArg().size());
+			tableWriter.cell(status.getArg().getDepth());
+			tableWriter.cell(status.getArg().getMeanBranchingFactor());
+			if (status.isUnsafe()) {
+				tableWriter.cell(status.asUnsafe().getTrace().length());
+			} else {
+				tableWriter.cell("");
+			}
+			tableWriter.cell(getCfaVars(cfa).size());
+			tableWriter.cell(cfa.getLocs().size());
+			tableWriter.newRow();
+		} else {
+			System.out.println("----------");
+			System.out.println("Slice " + i);
+			System.out.println("----------");
+			System.out.println("Safe = " + status.isSafe());
+			System.out.println("TimeElapsedInMs = " + sliceVerifTime);
+			System.out.println("Iterations = " + sliceCegarIterations);
+			System.out.println("ArgSize = " + status.getArg().size());
+			System.out.println("ArgDepth = " + status.getArg().getDepth());
+			System.out.println();
+		}
+	}
+
+	private static Set<VarDecl<? extends Type>> getCfaVars(final CFA cfa) {
+		final Set<VarDecl<? extends Type>> vars = new HashSet<>();
+		for (final CfaEdge edge : cfa.getEdges()) {
+			vars.addAll(StmtUtils.getVars(edge.getStmts()));
+		}
+		return vars;
 	}
 
 	private static enum Slicer {
