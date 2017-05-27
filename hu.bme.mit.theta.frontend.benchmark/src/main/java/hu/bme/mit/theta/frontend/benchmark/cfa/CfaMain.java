@@ -59,7 +59,6 @@ public class CfaMain {
 		final TableWriter tableWriter = new SimpleTableWriter(System.out, ",", "\"", "\"");
 		// If only called with a single --header argument, print header and exit
 		if (args.length == 1 && "--header".equals(args[0])) {
-			tableWriter.cell("SliceNo");
 			tableWriter.cell("Safe");
 			tableWriter.cell("TimeMs");
 			tableWriter.cell("Iterations");
@@ -215,9 +214,6 @@ public class CfaMain {
 			final TableWriter tableWriter) throws AssertionError {
 
 		log.writeHeader("Slice #" + sliceNo, 1);
-		if (benchmarkMode) {
-			tableWriter.cell(sliceNo);
-		}
 
 		try {
 			final Slice slice = slices.get(sliceNo);
