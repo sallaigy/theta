@@ -91,7 +91,7 @@ public class CfaMain {
 		options.addOption(optSlice);
 
 		final Option optRefinementSlicer = new Option("e", "refinement-slicer", true,
-				"Refinement slicer (default : BACKWARD)");
+				"Refinement slicer (default : same as slicer)");
 		optRefinementSlicer.setRequired(false);
 		optRefinementSlicer.setArgName("BACKWARD|VALUE|THIN");
 		options.addOption(optRefinementSlicer);
@@ -157,8 +157,9 @@ public class CfaMain {
 		final PrecGranularity pg = PrecGranularity.valueOf(cmd.getOptionValue(optPrecGran.getOpt()));
 
 		final FunctionSlicer slicer = Slicer.valueOf(cmd.getOptionValue(optSlice.getOpt(), "BACKWARD")).createSlicer();
-		final FunctionSlicer refinementSlicer = Slicer
-				.valueOf(cmd.getOptionValue(optRefinementSlicer.getOpt(), "BACKWARD")).createSlicer();
+		final FunctionSlicer refinementSlicer = Slicer.valueOf(
+				cmd.getOptionValue(optRefinementSlicer.getOpt(), cmd.getOptionValue(optSlice.getOpt(), "BACKWARD")))
+				.createSlicer();
 		final boolean optimize = Boolean.parseBoolean(cmd.getOptionValue(optOptimize.getOpt(), "true"));
 
 		final int verbosity = Integer.parseInt(cmd.getOptionValue(optVerbosity.getOpt(), "1"));
