@@ -59,7 +59,7 @@ public class CfaMain {
 		final TableWriter tableWriter = new SimpleTableWriter(System.out, ",", "\"", "\"");
 		// If only called with a single --header argument, print header and exit
 		if (args.length == 1 && "--header".equals(args[0])) {
-			tableWriter.cell("Safe");
+			tableWriter.cell("Result");
 			tableWriter.cell("TimeMs");
 			tableWriter.cell("Iterations");
 			tableWriter.cell("ArgSize");
