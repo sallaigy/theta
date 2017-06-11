@@ -1,1 +1,0 @@
-powershell ..\Run-Measurements.ps1 -jarFile theta-cfa.jar -modelsFiles models-cfa.csv -configsFile configs-cfa.csv -timeOut 600 -runs 1 -toNoRep -jvmArgs \"-ea\" -rBin \"C:/Program Files/R/R-3.3.2/bin/\" -rReport ../dashboard-generic.Rmd -transform ./Transform-Cfa.ps1
